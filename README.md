@@ -15,7 +15,7 @@ The infrastructure consists of:
 - CloudWatch Logs for experiment logs
 
 The EC2 instances run Amazon Linux 2 with a simple web server displaying instance metadata and availability zone information.
-See the detailed Architecture diagram in [docs/archi.md](docs/archi.md).
+See the detailed [Architecture diagram](docs/archi.md).
 
 ## Chaos Experiments
 
@@ -45,7 +45,7 @@ terraform apply tfplan
 
 ## Running Experiments
 
-The project includes a comprehensive bash script (`chaos-experiment.sh`) to facilitate running the chaos experiments:
+The project includes a comprehensive bash script `chaos-experiment.sh` to facilitate running the chaos experiments:
 
 ```bash
 # Deploy the infrastructure
