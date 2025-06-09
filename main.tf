@@ -184,7 +184,7 @@ resource "aws_launch_template" "web" {
               # Update index.html with actual metadata
               INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
               AZ=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-              TIMESTAMP=$(date)
+              Deployment date=$(date)
               
               # Create web page for Paris region
               cat > /var/www/html/index.html << 'HTML'
@@ -193,39 +193,164 @@ resource "aws_launch_template" "web" {
               <head>
                   <title>Chaos Engineering Demo - Paris Region</title>
                   <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   <style>
-                      body { font-family: Arial, sans-serif; margin: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-                      .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
-                      .status { padding: 20px; border-radius: 10px; margin: 20px 0; background: rgba(255,255,255,0.2); }
-                      .healthy { border-left: 5px solid #28a745; }
-                      .region-info { background: rgba(0,123,255,0.2); padding: 15px; border-radius: 8px; margin: 15px 0; }
-                      .emoji { font-size: 1.2em; }
+                      body {
+                          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                          line-height: 1.6;
+                          margin: 0;
+                          padding: 40px;
+                          background-color: #f8f9fa;
+                          color: #333;
+                      }
+                      .container {
+                          max-width: 800px;
+                          margin: 0 auto;
+                          background: white;
+                          padding: 40px;
+                          border-radius: 8px;
+                          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                      }
+                      h1 {
+                          font-size: 2rem;
+                          font-weight: 600;
+                          margin: 0 0 30px 0;
+                          color: #2c3e50;
+                          border-bottom: 2px solid #e9ecef;
+                          padding-bottom: 15px;
+                      }
+                      h2 {
+                          font-size: 1.25rem;
+                          font-weight: 500;
+                          margin: 25px 0 15px 0;
+                          color: #495057;
+                      }
+                      h3 {
+                          font-size: 1.1rem;
+                          font-weight: 500;
+                          margin: 20px 0 10px 0;
+                          color: #6c757d;
+                      }
+                      .info-grid {
+                          display: grid;
+                          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                          gap: 20px;
+                          margin: 20px 0;
+                      }
+                      .info-card {
+                          background: #f8f9fa;
+                          padding: 20px;
+                          border-radius: 6px;
+                          border-left: 4px solid #007bff;
+                      }
+                      .status-healthy {
+                          border-left-color: #28a745;
+                      }
+                      .status-healthy h2 {
+                          color: #155724;
+                      }
+                      .region-info {
+                          background: #e3f2fd;
+                          border-left-color: #1976d2;
+                      }
+                      .region-info h2 {
+                          color: #0d47a1;
+                      }
+                      .experiment-info {
+                          background: #fff3e0;
+                          border-left-color: #f57c00;
+                      }
+                      .experiment-info h2 {
+                          color: #e65100;
+                      }
+                      .data-row {
+                          display: flex;
+                          justify-content: space-between;
+                          padding: 8px 0;
+                          border-bottom: 1px solid #dee2e6;
+                      }
+                      .data-row:last-child {
+                          border-bottom: none;
+                      }
+                      .data-label {
+                          font-weight: 500;
+                          color: #6c757d;
+                      }
+                      .data-value {
+                          font-family: 'SFMono-Regular', Consolas, monospace;
+                          color: #495057;
+                      }
+                      ul {
+                          margin: 15px 0;
+                          padding-left: 20px;
+                      }
+                      li {
+                          margin: 8px 0;
+                          color: #495057;
+                      }
+                      .footer {
+                          margin-top: 40px;
+                          padding-top: 20px;
+                          border-top: 1px solid #dee2e6;
+                          font-size: 0.9rem;
+                          color: #6c757d;
+                          text-align: center;
+                      }
                   </style>
               </head>
               <body>
                   <div class="container">
-                      <h1><span class="emoji">🚀</span> Chaos Engineering Demo - Paris Region <span class="emoji">🗼</span></h1>
-                      <div class="region-info">
-                          <h3><span class="emoji">🌍</span> AWS Region: Europe (Paris) - eu-west-3</h3>
-                          <p>Server deployed in AWS Paris region</p>
+                      <h1>Chaos Engineering Demo - Paris Region</h1>
+                      
+                      <div class="info-grid">
+                          <div class="info-card region-info">
+                              <h2>AWS Region Information</h2>
+                              <div class="data-row">
+                                  <span class="data-label">Region:</span>
+                                  <span class="data-value">Europe (Paris) - eu-west-3</span>
+                              </div>
+                              <div class="data-row">
+                                  <span class="data-label">Deployment:</span>
+                                  <span class="data-value">AWS Paris Region</span>
+                              </div>
+                          </div>
+                          
+                          <div class="info-card status-healthy">
+                              <h2>Service Status</h2>
+                              <div class="data-row">
+                                  <span class="data-label">Status:</span>
+                                  <span class="data-value">Operational</span>
+                              </div>
+                              <div class="data-row">
+                                  <span class="data-label">SSM Agent:</span>
+                                  <span class="data-value">Ready</span>
+                              </div>
+                          </div>
                       </div>
-                      <div class="status healthy">
-                          <h2><span class="emoji">✅</span> Service Status: Healthy</h2>
-                          <p><strong>Instance ID:</strong> INSTANCE_ID_PLACEHOLDER</p>
-                          <p><strong>Availability Zone:</strong> AZ_PLACEHOLDER</p>
-                          <p><strong>Timestamp:</strong> TIMESTAMP_PLACEHOLDER</p>
-                          <p><strong>Timezone:</strong> Europe/Paris (CET/CEST)</p>
-                          <p><strong>SSM Status:</strong> Ready for chaos experiments</p>
+                      
+                      <div class="info-card">
+                          <h2>Instance Details</h2>
+                          <div class="data-row">
+                              <span class="data-label">Instance ID:</span>
+                              <span class="data-value">INSTANCE_ID_PLACEHOLDER</span>
+                          </div>
+                          <div class="data-row">
+                              <span class="data-label">Availability Zone:</span>
+                              <span class="data-value">AZ_PLACEHOLDER</span>
+                          </div>
+                          <div class="data-row">
+                              <span class="data-label">Timestamp:</span>
+                              <span class="data-value">TIMESTAMP_PLACEHOLDER</span>
+                          </div>
+                          <div class="data-row">
+                              <span class="data-label">Timezone:</span>
+                              <span class="data-value">Europe/Paris (CET/CEST)</span>
+                          </div>
                       </div>
-                      <h3><span class="emoji">🧪</span> Ready for Chaos Experiments!</h3>
-                      <p>This instance is ready to participate in AWS FIS experiments in the Paris region.</p>
-                      <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-top: 20px;">
-                          <h4><span class="emoji">🔬</span> Available experiment types:</h4>
-                          <ul>
-                              <li>Random instance termination</li>
-                              <li>CPU stress testing (stress tool installed)</li>
-                              <li>Load balancer resilience testing</li>
-                          </ul>
+                  
+                      
+                      <div class="footer">
+                          AWS Chaos Engineering using AWS Fault Injection Simulator
                       </div>
                   </div>
               </body>
@@ -241,6 +366,7 @@ resource "aws_launch_template" "web" {
               timedatectl set-timezone Europe/Paris
               EOF
   )
+
 
   tag_specifications {
     resource_type = "instance"

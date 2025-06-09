@@ -1,5 +1,5 @@
-Architecture diagram
-====================
+Architecture
+============
 
 ```mermaid
 graph TB
