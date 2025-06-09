@@ -36,7 +36,8 @@ check_requirements() {
     command -v terraform >/dev/null 2>&1 || { print_error "Terraform is required but not installed. Aborting."; exit 1; }
     command -v jq >/dev/null 2>&1 || { print_error "jq is required but not installed. Aborting."; exit 1; }
     
-    local configured_region=$(aws configure get region)
+    local configured_region
+    configured_region=$(aws configure get region)
     if [ "$configured_region" != "$AWS_REGION" ]; then
         print_warning "AWS region configured: $configured_region, required region: $AWS_REGION"
         print_status "Configuring AWS region..."
@@ -65,7 +66,8 @@ deploy_infrastructure() {
     
     # Wait for load balancer to be ready
     print_status "Waiting for load balancer to be ready..."
-    local lb_url=$(terraform output -raw load_balancer_url)
+    local lb_url
+    lb_url=$(terraform output -raw load_balancer_url)
     local ready=false
     local attempts=0
     
@@ -103,7 +105,8 @@ run_experiment() {
     print_header "Running Experiment: $experiment_name"
     
     # Start the experiment
-    local execution_id=$(aws fis start-experiment \
+    local execution_id
+    execution_id=$(aws fis start-experiment \
         --experiment-template-id "$experiment_id" \
         --region "$AWS_REGION" \
         --query 'experiment.id' \
@@ -114,7 +117,8 @@ run_experiment() {
     
     # Monitor experiment status
     while true; do
-        local status=$(aws fis get-experiment \
+        local status
+        status=$(aws fis get-experiment \
             --id "$execution_id" \
             --region "$AWS_REGION" \
             --query 'experiment.state.status' \
@@ -153,7 +157,8 @@ run_experiment() {
 monitor_health() {
     print_header "Monitoring Application Health"
     
-    local lb_url=$(terraform output -raw load_balancer_url)
+    local lb_url
+    lb_url=$(terraform output -raw load_balancer_url)
     local check_count=0
     local success_count=0
     local failure_count=0
@@ -170,8 +175,10 @@ monitor_health() {
         
         # Show progress every 30 seconds
         if [ $((check_count % 6)) -eq 5 ]; then
-            local timestamp=$(date '+%H:%M:%S')
-            local current_rate=$(echo "scale=1; $success_count * 100 / ($check_count + 1)" | bc -l)
+            local timestamp
+            timestamp=$(date '+%H:%M:%S')
+            local current_rate
+            current_rate=$(echo "scale=1; $success_count * 100 / ($check_count + 1)" | bc -l)
             print_status "[$timestamp] Health checks: ${success_count}/$((check_count + 1)) successful (${current_rate}%)"
         fi
         
@@ -189,8 +196,10 @@ monitor_health() {
 check_metrics() {
     print_header "Checking CloudWatch Metrics"
     
-    local end_time=$(date -u +%Y-%m-%dT%H:%M:%S)
-    local start_time=$(date -u -v-1H +%Y-%m-%dT%H:%M:%S)
+    local end_time
+    end_time=$(date -u +%Y-%m-%dT%H:%M:%S)
+    local start_time
+    start_time=$(date -u -v-1H +%Y-%m-%dT%H:%M:%S)
     
     # Get CPU utilization metrics
     aws cloudwatch get-metric-statistics \
