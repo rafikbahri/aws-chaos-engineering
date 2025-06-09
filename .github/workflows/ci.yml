@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: '1.5.0'
+
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+
+    - name: Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+
+    - name: Lint Shell Script
+      run: shellcheck chaos-experiment.sh
