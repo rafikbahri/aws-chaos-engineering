@@ -1,5 +1,3 @@
-
-# IAM Role for FIS
 resource "aws_iam_role" "fis_role" {
   name = "${var.project_name}-fis-role"
 
@@ -22,7 +20,6 @@ resource "aws_iam_role" "fis_role" {
   }
 }
 
-# IAM Policy for FIS
 resource "aws_iam_role_policy" "fis_policy" {
   name = "${var.project_name}-fis-policy"
   role = aws_iam_role.fis_role.id
@@ -48,7 +45,14 @@ resource "aws_iam_role_policy" "fis_policy" {
           "logs:CreateLogDelivery",
           "logs:PutResourcePolicy",
           "logs:DescribeResourcePolicies",
-          "logs:DescribeLogGroups"
+          "logs:DescribeLogGroups",
+          "ssm:SendCommand",
+          "ssm:ListCommands",
+          "ssm:ListCommandInvocations",
+          "ssm:DescribeInstanceInformation",
+          "ssm:GetCommandInvocation",
+          "ssm:DescribeInstanceAssociationsStatus",
+          "ssm:DescribeEffectiveInstanceAssociations"
         ]
         Resource = "*"
       }
@@ -56,7 +60,6 @@ resource "aws_iam_role_policy" "fis_policy" {
   })
 }
 
-# FIS Experiment Template - Stop EC2 Instances
 resource "aws_fis_experiment_template" "stop_instances" {
   description = "Stop random EC2 instances to test resilience"
   role_arn    = aws_iam_role.fis_role.arn
@@ -69,11 +72,6 @@ resource "aws_fis_experiment_template" "stop_instances" {
   action {
     name      = "StopInstances"
     action_id = "aws:ec2:stop-instances"
-
-    parameter {
-      key   = "startInstancesAfterDuration"
-      value = "PT10M" # Stop for 10 minutes
-    }
 
     target {
       key   = "Instances"
@@ -103,7 +101,6 @@ resource "aws_fis_experiment_template" "stop_instances" {
   }
 }
 
-# FIS Experiment Template - CPU Stress
 resource "aws_fis_experiment_template" "cpu_stress" {
   description = "Apply CPU stress to test performance under load"
   role_arn    = aws_iam_role.fis_role.arn
@@ -135,7 +132,6 @@ resource "aws_fis_experiment_template" "cpu_stress" {
       value = "PT10M"
     }
 
-
     target {
       key   = "Instances"
       value = "stress-instances"
@@ -160,17 +156,6 @@ resource "aws_fis_experiment_template" "cpu_stress" {
 
   tags = {
     Name        = "${var.project_name}-cpu-stress"
-    Environment = var.environment
-  }
-}
-
-# CloudWatch Log Group for FIS
-resource "aws_cloudwatch_log_group" "fis_logs" {
-  name              = "/aws/fis/${var.project_name}"
-  retention_in_days = 7
-
-  tags = {
-    Name        = "${var.project_name}-fis-logs"
     Environment = var.environment
   }
 }

@@ -2,14 +2,16 @@
 
 set -e
 
-PROJECT_NAME="chaos-engineering-experiment"
+# Configuration
+PROJECT_NAME="chaos-engineering-demo"
 AWS_REGION="eu-west-3"
 
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # No color
 
 print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -26,6 +28,7 @@ print_error() {
 print_header() {
     echo -e "${BLUE}=== $1 ===${NC}"
 }
+
 check_requirements() {
     print_header "Checking Requirements"
     
@@ -36,7 +39,7 @@ check_requirements() {
     local configured_region=$(aws configure get region)
     if [ "$configured_region" != "$AWS_REGION" ]; then
         print_warning "AWS region configured: $configured_region, required region: $AWS_REGION"
-        print_status "Configuring AWS region for Paris..."
+        print_status "Configuring AWS region..."
         aws configure set region $AWS_REGION
     fi
     
@@ -47,6 +50,7 @@ check_requirements() {
 deploy_infrastructure() {
     print_header "Deploying Infrastructure"
     
+    # Check if SSH key exists
     if [ ! -f ~/.ssh/id_rsa.pub ]; then
         print_warning "SSH public key not found at ~/.ssh/id_rsa.pub"
         print_status "Generating SSH key pair..."
@@ -54,11 +58,12 @@ deploy_infrastructure() {
     fi
     
     terraform init
-    terraform plan -var="aws_region=$AWS_REGION"
-    terraform apply
+    terraform plan -var="aws_region=$AWS_REGION" -out=tfplan
+    terraform apply tfplan
     
     print_status "Infrastructure deployed successfully in region $AWS_REGION"
     
+    # Wait for load balancer to be ready
     print_status "Waiting for load balancer to be ready..."
     local lb_url=$(terraform output -raw load_balancer_url)
     local ready=false
@@ -88,7 +93,7 @@ get_experiment_ids() {
     print_status "Stop Instances Experiment ID: $STOP_INSTANCES_ID"
     print_status "CPU Stress Experiment ID: $CPU_STRESS_ID"
     print_status "Load Balancer URL: $LB_URL"
-    print_status "Region: $AWS_REGION (Paris)"
+    print_status "Region: $AWS_REGION"
 }
 
 run_experiment() {
@@ -97,6 +102,7 @@ run_experiment() {
     
     print_header "Running Experiment: $experiment_name"
     
+    # Start the experiment
     local execution_id=$(aws fis start-experiment \
         --experiment-template-id "$experiment_id" \
         --region "$AWS_REGION" \
@@ -104,8 +110,9 @@ run_experiment() {
         --output text)
     
     print_status "Experiment started with ID: $execution_id"
-    print_status "Region: $AWS_REGION (Paris)"
+    print_status "Region: $AWS_REGION"
     
+    # Monitor experiment status
     while true; do
         local status=$(aws fis get-experiment \
             --id "$execution_id" \
@@ -134,12 +141,13 @@ run_experiment() {
         esac
     done
     
+    experiment_output_file="experiment_${execution_id}_results.json"
     aws fis get-experiment \
         --id "$execution_id" \
         --region "$AWS_REGION" \
-        --output json > "experiment_${execution_id}_results.json"
+        --output json > "$experiment_output_file"
     
-    print_status "Experiment completed. Results saved to experiment_${execution_id}_results.json"
+    print_status "Experiment completed. Results saved to $experiment_output_file"
 }
 
 monitor_health() {
@@ -151,40 +159,40 @@ monitor_health() {
     local failure_count=0
     
     print_status "Monitoring $lb_url for 5 minutes..."
-    print_status "Region: $AWS_REGION (Paris - Europe/Paris timezone)"
+    print_status "Region: $AWS_REGION"
     
     while [ $check_count -lt 60 ]; do
-        local timestamp=$(date '+%H:%M:%S')
         if curl -s -o /dev/null -w "%{http_code}" "$lb_url" | grep -q "200"; then
             success_count=$((success_count + 1))
-            echo -n "✓"
         else
             failure_count=$((failure_count + 1))
-            echo -n "✗"
         fi
         
-        if [ $((check_count % 10)) -eq 9 ]; then
-            echo " [$timestamp]"
+        # Show progress every 30 seconds
+        if [ $((check_count % 6)) -eq 5 ]; then
+            local timestamp=$(date '+%H:%M:%S')
+            local current_rate=$(echo "scale=1; $success_count * 100 / ($check_count + 1)" | bc -l)
+            print_status "[$timestamp] Health checks: ${success_count}/$((check_count + 1)) successful (${current_rate}%)"
         fi
         
         check_count=$((check_count + 1))
         sleep 5
     done
     
-    echo ""
     print_status "Health check completed:"
     print_status "  Successful checks: $success_count/60"
     print_status "  Failed checks: $failure_count/60"
     print_status "  Success rate: $(echo "scale=2; $success_count * 100 / 60" | bc -l)%"
-    print_status "  Region: $AWS_REGION (Paris)"
+    print_status "  Region: $AWS_REGION"
 }
 
 check_metrics() {
     print_header "Checking CloudWatch Metrics"
     
     local end_time=$(date -u +%Y-%m-%dT%H:%M:%S)
-    local start_time=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)
+    local start_time=$(date -u -v-1H +%Y-%m-%dT%H:%M:%S)
     
+    # Get CPU utilization metrics
     aws cloudwatch get-metric-statistics \
         --namespace AWS/EC2 \
         --metric-name CPUUtilization \
@@ -194,12 +202,7 @@ check_metrics() {
         --period 300 \
         --statistics Average \
         --region "$AWS_REGION" \
-        --output table
-    
-    aws elbv2 describe-target-health \
-        --target-group-arn $(terraform output -raw | grep target_group | cut -d'"' -f4) \
-        --region "$AWS_REGION" \
-        --output table
+        --output table    
 }
 
 cleanup() {
@@ -210,7 +213,7 @@ cleanup() {
     echo
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        terraform destroy -auto-approve
+        terraform destroy
         print_status "Resources cleaned up successfully"
     else
         print_status "Cleanup cancelled"
@@ -233,17 +236,14 @@ run_complete_experiment() {
     
     print_status "Waiting for application to be ready..."
     sleep 60
-    
     run_experiment "$STOP_INSTANCES_ID" "Stop Instances"
     
     sleep 120
-    
     run_experiment "$CPU_STRESS_ID" "CPU Stress"
     
     kill $monitor_pid 2>/dev/null || true
     
     check_metrics
-    
     print_status "Complete chaos engineering experiment finished"
 }
 
@@ -273,7 +273,7 @@ case "${1:-help}" in
         cleanup
         ;;
     "help"|*)
-        echo "Chaos Engineering Experiment Runner - Paris Region (eu-west-3)"
+        echo "Chaos Engineering Experiment Runner"
         echo ""
         echo "Usage: $0 [command]"
         echo ""
@@ -292,6 +292,6 @@ case "${1:-help}" in
         echo "  2. $0 run-complete"
         echo "  3. $0 cleanup"
         echo ""
-        echo "AWS Region: $AWS_REGION (Paris)"
+        echo "AWS Region: $AWS_REGION"
         ;;
 esac

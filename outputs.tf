@@ -27,3 +27,8 @@ output "sns_topic_arn" {
   description = "SNS topic ARN for alerts"
   value       = aws_sns_topic.alerts.arn
 }
+
+output "target_group_arn" {
+  description = "Target group ARN for health checks"
+  value       = aws_lb_target_group.web.arn
+}

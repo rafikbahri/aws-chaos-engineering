@@ -1,6 +1,9 @@
 # Local .terraform directories
 .terraform/
 
+# AWS FIS Experiments
+experiment*.json
+
 # .tfstate files
 *.tfstate
 *.tfstate.*

@@ -1,20 +1,3 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-  }
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-}
-
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -102,6 +85,23 @@ resource "aws_security_group" "web" {
   }
 }
 
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
 resource "aws_lb" "main" {
   name               = "${var.project_name}-alb"
   internal           = false
@@ -160,41 +160,26 @@ resource "aws_launch_template" "web" {
 
   vpc_security_group_ids = [aws_security_group.web.id]
 
+  # IAM instance profile for SSM access
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
+
   user_data = base64encode(<<-EOF
               #!/bin/bash
               yum update -y
               yum install -y httpd
+              
+              # Install and configure SSM agent
+              yum install -y amazon-ssm-agent
+              systemctl enable amazon-ssm-agent
+              systemctl start amazon-ssm-agent
+              
+              # Install stress tool for CPU testing
+              yum install -y stress
+              
               systemctl start httpd
               systemctl enable httpd
-              
-              # Create a simple web page
-              cat > /var/www/html/index.html << 'HTML'
-              <!DOCTYPE html>
-              <html>
-              <head>
-                  <title>Chaos Engineering Demo</title>
-                  <style>
-                      body { font-family: Arial, sans-serif; margin: 40px; }
-                      .container { max-width: 800px; margin: 0 auto; }
-                      .status { padding: 20px; border-radius: 5px; margin: 20px 0; }
-                      .healthy { background-color: #d4edda; color: #155724; }
-                  </style>
-              </head>
-              <body>
-                  <div class="container">
-                      <h1>🚀 Chaos Engineering Demo</h1>
-                      <div class="status healthy">
-                          <h2>✅ Service Status: Healthy</h2>
-                          <p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>
-                          <p>Availability Zone: $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</p>
-                          <p>Timestamp: $(date)</p>
-                      </div>
-                      <h3>Ready for Chaos Experiments!</h3>
-                      <p>This instance is ready to participate in AWS FIS experiments.</p>
-                  </div>
-              </body>
-              </html>
-              HTML
               
               # Update index.html with actual metadata
               INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
@@ -230,6 +215,7 @@ resource "aws_launch_template" "web" {
                           <p><strong>Availability Zone:</strong> AZ_PLACEHOLDER</p>
                           <p><strong>Timestamp:</strong> TIMESTAMP_PLACEHOLDER</p>
                           <p><strong>Timezone:</strong> Europe/Paris (CET/CEST)</p>
+                          <p><strong>SSM Status:</strong> Ready for chaos experiments</p>
                       </div>
                       <h3><span class="emoji">🧪</span> Ready for Chaos Experiments!</h3>
                       <p>This instance is ready to participate in AWS FIS experiments in the Paris region.</p>
@@ -237,7 +223,7 @@ resource "aws_launch_template" "web" {
                           <h4><span class="emoji">🔬</span> Available experiment types:</h4>
                           <ul>
                               <li>Random instance termination</li>
-                              <li>CPU stress testing</li>
+                              <li>CPU stress testing (stress tool installed)</li>
                               <li>Load balancer resilience testing</li>
                           </ul>
                       </div>
@@ -271,9 +257,42 @@ resource "aws_launch_template" "web" {
   }
 }
 
-resource "aws_key_pair" "main" {
-  key_name   = "${var.project_name}-key"
-  public_key = file("~/.ssh/id_rsa.pub")
+# IAM Role for EC2 instances to use SSM
+resource "aws_iam_role" "ec2_ssm_role" {
+  name = "${var.project_name}-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-ec2-ssm-role"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm_policy" {
+  role       = aws_iam_role.ec2_ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project_name}-ec2-profile"
+  role = aws_iam_role.ec2_ssm_role.name
+
+  tags = {
+    Name        = "${var.project_name}-ec2-profile"
+    Environment = var.environment
+  }
 }
 
 resource "aws_autoscaling_group" "web" {
